@@ -63,8 +63,11 @@ public final class BottomSheetPresentationController: UIPresentationController {
 
     private weak var trackedScrollView: UIScrollView?
 
+    
     private var cachedInsets: UIEdgeInsets = .zero
-
+    // Define adjustedInsets to handle safe area adjustments for all necessary methods
+    private var adjustedInsets: UIEdgeInsets = .zero
+    
     private let dismissalHandler: BottomSheetModalDismissalHandler
     private let configuration: BottomSheetConfiguration
 
@@ -118,8 +121,12 @@ public final class BottomSheetPresentationController: UIPresentationController {
     // MARK: - UIPresentationController
 
     public override func presentationTransitionWillBegin() {
+        
         state = .presenting
-
+        // Set adjustedInsets with fallback values for consistent positioning on all devices
+        let fallbackInset: CGFloat = 20
+        adjustedInsets = containerView?.safeAreaInsets ?? UIEdgeInsets(top: fallbackInset, left: 0, bottom: fallbackInset, right: 0)
+    
         addSubviews()
     }
 
@@ -167,7 +174,10 @@ public final class BottomSheetPresentationController: UIPresentationController {
     }
 
     public override func containerViewDidLayoutSubviews() {
-        cachedInsets = presentedView?.window?.safeAreaInsets ?? .zero
+        
+        // Ensure cachedInsets have a fallback for small screens and Touch ID devices
+        cachedInsets = presentedView?.window?.safeAreaInsets ?? UIEdgeInsets(top: 20, left: 0, bottom: 20, right: 0)
+    
 
         updatePresentedViewSize()
     }
@@ -323,9 +333,14 @@ public final class BottomSheetPresentationController: UIPresentationController {
             return .zero
         }
 
-        let windowInsets = presentedView?.window?.safeAreaInsets ?? cachedInsets
-
-        let preferredHeight = presentedViewController.preferredContentSize.height + windowInsets.bottom
+        let windowInsets = adjustedInsets
+        
+        
+        // Apply fallback for safe area insets if zero, especially on older devices
+        let fallbackInset: CGFloat = 20
+        let adjustedInsets = windowInsets == .zero ? UIEdgeInsets(top: fallbackInset, left: 0, bottom: fallbackInset, right: 0) : windowInsets
+        let preferredHeight = presentedViewController.preferredContentSize.height + adjustedInsets.bottom
+    
         var maxHeight = containerView.bounds.height - windowInsets.top
         if case .visible(let appearance) = configuration.pullBarConfiguration {
             maxHeight -= appearance.height
@@ -529,13 +544,11 @@ extension BottomSheetPresentationController: UIViewControllerAnimatedTransitioni
         destinationView.layoutIfNeeded()
 
         let frameInContainer = frameOfPresentedViewInContainerView
-        let offscreenFrame = CGRect(
-            origin: CGPoint(
-                x: 0,
-                y: containerView.bounds.height
-            ),
-            size: sourceView.frame.size
-        )
+        
+        // Position offscreen frame correctly, accounting for safe area adjustments
+        let yPosition = containerView.bounds.height + adjustedInsets.bottom
+        let offscreenFrame = CGRect(origin: CGPoint(x: 0, y: yPosition), size: sourceView.frame.size)
+        
 
         let updatePullBarFrame = {
             guard case .visible(let appearnce) = self.configuration.pullBarConfiguration else { return }
